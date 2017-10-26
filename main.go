@@ -92,15 +92,22 @@ func main() {
 
 	ctx := context.Background()
 
+	seen := make(map[string]bool)
+
 	for {
 		select {
 
 		case userName := <-userChan:
-			err := limiter.Wait(ctx)
-			if err != nil {
-				log.Fatalln(err)
+			if seen[userName] == false {
+				err := limiter.Wait(ctx)
+				if err != nil {
+					log.Fatalln(err)
+				}
+				go crawler.crawl(ctx, userName, userChan)
+				seen[userName] = true
+			} else {
+				log.Println("Already crawled: %s", userName)
 			}
-			go crawler.crawl(ctx, userName, userChan)
 		case <-ctx.Done():
 			log.Println(ctx.Err())
 		}

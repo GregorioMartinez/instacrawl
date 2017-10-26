@@ -15,6 +15,8 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"sync"
+
 	"github.com/ahmdrz/goinsta"
 	"github.com/ahmdrz/goinsta/response"
 )
@@ -76,6 +78,7 @@ func main() {
 	crawler := InstagramCrawler{
 		service: instagram,
 		limiter: limiter,
+		mutex:   &sync.Mutex{},
 	}
 
 	if err := crawler.service.Login(); err != nil {

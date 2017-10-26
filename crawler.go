@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/ahmdrz/goinsta"
@@ -12,11 +13,14 @@ import (
 type InstagramCrawler struct {
 	service *goinsta.Instagram
 	limiter *rate.Limiter
+	mutex   *sync.Mutex
 }
 
 func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
 	crawler.limiter.Wait(context.Background())
+	crawler.mutex.Lock()
 	followerResp, err := crawler.service.UserFollowers(userID, maxID)
+	crawler.mutex.Unlock()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -42,7 +46,9 @@ func (crawler InstagramCrawler) crawl(ctx context.Context, userName string, user
 	//@TODO fix ctx
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
 	defer cancel()
+	crawler.mutex.Lock()
 	resp, err := crawler.service.GetUserByUsername(userName)
+	crawler.mutex.Unlock()
 	if err != nil {
 		log.Fatalf("unable to get user info for %s \n", userName)
 	}

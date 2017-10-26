@@ -49,8 +49,8 @@ func main() {
 	configPath := flag.String("config", "", "Path of config file")
 	flag.Parse()
 
-	limit := rate.Every(time.Second * 100)
-	limiter := rate.NewLimiter(limit, 100)
+	limit := rate.Every(time.Second * 2)
+	limiter := rate.NewLimiter(limit, 10)
 
 	config, err := getConfig(*configPath)
 	if err != nil {

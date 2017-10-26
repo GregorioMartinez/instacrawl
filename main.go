@@ -97,7 +97,7 @@ func main() {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			go crawl(ctx, crawler, userName, userChan)
+			go crawler.crawl(ctx, userName, userChan)
 		case <-ctx.Done():
 			log.Println(ctx.Err())
 		}
@@ -123,47 +123,4 @@ func saveUserToFile(resp response.GetUsernameResponse) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-}
-
-func getFollowers(crawler InstagramCrawler, userChan chan<- string, userID int64, maxID string) {
-	crawler.limiter.Wait(context.Background())
-	followerResp, err := crawler.service.UserFollowers(userID, maxID)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if len(followerResp.Users) > 0 {
-		go func() {
-			for _, followers := range followerResp.Users {
-				userChan <- followers.Username
-				log.Printf("Added %s to userChan \n", followers.Username)
-			}
-			// no need to crawl followers of followers yet
-			close(userChan)
-		}()
-	} else {
-		return
-	}
-
-	if followerResp.NextMaxID != "" {
-		getFollowers(crawler, userChan, userID, followerResp.NextMaxID)
-	}
-}
-
-func crawl(ctx context.Context, crawler InstagramCrawler, userName string, userChan chan<- string) {
-	//@TODO fix ctx
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
-	defer cancel()
-	resp, err := crawler.service.GetUserByUsername(userName)
-	if err != nil {
-		log.Fatalf("unable to get user info for %s \n", userName)
-	}
-	if resp.Status != "ok" {
-		log.Fatalln(resp.Status)
-	}
-
-	go saveUserToFile(resp)
-
-	go getFollowers(crawler, userChan, resp.User.ID, "")
-
-	return
 }

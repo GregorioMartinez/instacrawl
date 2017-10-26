@@ -11,9 +11,11 @@ import (
 )
 
 type InstagramCrawler struct {
-	service *goinsta.Instagram
-	limiter *rate.Limiter
-	mutex   *sync.Mutex
+	service  *goinsta.Instagram
+	limiter  *rate.Limiter
+	mutex    *sync.Mutex
+	depth    int
+	curDepth int
 }
 
 func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
@@ -27,8 +29,10 @@ func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int
 	if len(followerResp.Users) > 0 {
 		go func() {
 			for _, followers := range followerResp.Users {
-				userChan <- followers.Username
-				log.Printf("Added %s to userChan \n", followers.Username)
+				if followers.Username != "" {
+					userChan <- followers.Username
+					log.Printf("Added %s to userChan \n", followers.Username)
+				}
 			}
 			// no need to crawl followers of followers yet
 			close(userChan)
@@ -42,7 +46,7 @@ func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int
 	}
 }
 
-func (crawler InstagramCrawler) crawl(ctx context.Context, userName string, userChan chan<- string) {
+func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, userChan chan<- string) {
 	//@TODO fix ctx
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
 	defer cancel()
@@ -50,7 +54,8 @@ func (crawler InstagramCrawler) crawl(ctx context.Context, userName string, user
 	resp, err := crawler.service.GetUserByUsername(userName)
 	crawler.mutex.Unlock()
 	if err != nil {
-		log.Fatalf("unable to get user info for %s \n", userName)
+		log.Printf("unable to get user info for %s \n", userName)
+		log.Fatalln(err)
 	}
 	if resp.Status != "ok" {
 		log.Fatalln(resp.Status)
@@ -59,7 +64,12 @@ func (crawler InstagramCrawler) crawl(ctx context.Context, userName string, user
 	//@TODO add save to struct
 	go saveUserToFile(resp)
 
-	go crawler.getFollowers(userChan, resp.User.ID, "")
+	crawler.mutex.Lock()
+	if crawler.curDepth <= crawler.depth {
+		go crawler.getFollowers(userChan, resp.User.ID, "")
+		crawler.curDepth++
+	}
+	crawler.mutex.Unlock()
 
 	return
 }

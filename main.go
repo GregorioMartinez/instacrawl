@@ -47,6 +47,7 @@ func main() {
 	//@TODO Add limiter flags
 	users := flag.String("users", "", "Comma separated list of usernames to scrape")
 	configPath := flag.String("config", "", "Path of config file")
+	depth := flag.Int("depth", 0, "Max depth to crawl")
 	flag.Parse()
 
 	limit := rate.Every(time.Second * 2)
@@ -76,6 +77,7 @@ func main() {
 	instagram := goinsta.New(config.Username, config.Password)
 
 	crawler := InstagramCrawler{
+		depth:   *depth,
 		service: instagram,
 		limiter: limiter,
 		mutex:   &sync.Mutex{},
@@ -98,6 +100,9 @@ func main() {
 		select {
 
 		case userName := <-userChan:
+			if userName == "" {
+				continue
+			}
 			if seen[userName] == false {
 				err := limiter.Wait(ctx)
 				if err != nil {
@@ -106,7 +111,7 @@ func main() {
 				go crawler.crawl(ctx, userName, userChan)
 				seen[userName] = true
 			} else {
-				log.Println("Already crawled: %s", userName)
+				log.Printf("Already crawled: %s \n", userName)
 			}
 		case <-ctx.Done():
 			log.Println(ctx.Err())

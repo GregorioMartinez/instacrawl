@@ -2,20 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
+	"path"
 	"sync"
 	"time"
 
-	"io"
-
-	"encoding/json"
-	"path"
+	"golang.org/x/time/rate"
 
 	"github.com/ahmdrz/goinsta"
 	"github.com/ahmdrz/goinsta/response"
-	"golang.org/x/time/rate"
 )
 
 type InstagramCrawler struct {
@@ -71,6 +72,7 @@ func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, use
 	}
 
 	go crawler.saveUserToFile(resp)
+	go crawler.saveUserPhoto(resp)
 
 	crawler.mutex.Lock()
 	if crawler.curDepth <= crawler.depth {
@@ -109,4 +111,19 @@ func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 		log.Fatalln(err)
 	}
 	crawler.saveUser(f, resp)
+}
+
+func (crawler *InstagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
+	resp, err := http.Get(r.User.HdProfilePicURLInfo.URL)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	p := path.Join(crawler.dir, r.User.Username)
+	ioutil.WriteFile(fmt.Sprintf("%s/%v-%s.jpg", p, time.Now().Unix(), r.User.Username), data, 0700)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -36,21 +37,15 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if len(*users) == 0 {
-		log.Fatalln("No usernames provided to scrape.")
-	}
-
 	userNames := strings.Split(*users, ",")
-
 	// User names to crawl
 	userChan := make(chan string)
 
-	go func() {
-		for _, userName := range userNames {
-			userChan <- userName
-			log.Printf("Added %s to userChan \n", userName)
-		}
-	}()
+	logFile, err := os.Create(fmt.Sprintf("%s/instacrawl.log", *output))
+	if err != nil {
+		log.Fatal("unable to create log file")
+	}
+	logger := log.New(logFile, "", log.Ldate|log.Ltime|log.Llongfile)
 
 	instagram := goinsta.New(config.Username, config.Password)
 
@@ -60,15 +55,27 @@ func main() {
 		limiter: limiter,
 		mutex:   &sync.Mutex{},
 		dir:     *output,
+		log:     logger,
 	}
 
+	if len(*users) == 0 {
+		crawler.log.Fatalln("No usernames provided to scrape.")
+	}
+
+	go func() {
+		for _, userName := range userNames {
+			userChan <- userName
+			crawler.log.Printf("Added %s to userChan \n", userName)
+		}
+	}()
+
 	if err := crawler.service.Login(); err != nil {
-		log.Fatalln("Unable to log in")
+		crawler.log.Fatalln("Unable to log in")
 	}
 	defer crawler.service.Logout()
 
 	if crawler.service.IsLoggedIn == false {
-		log.Fatalln("Not logged in")
+		crawler.log.Fatalln("Not logged in")
 	}
 
 	ctx := context.Background()
@@ -85,15 +92,15 @@ func main() {
 			if seen[userName] == false {
 				err := limiter.Wait(ctx)
 				if err != nil {
-					log.Fatalln(err)
+					crawler.log.Fatalln(err)
 				}
 				go crawler.crawl(ctx, userName, userChan)
 				seen[userName] = true
 			} else {
-				log.Printf("Already crawled: %s \n", userName)
+				crawler.log.Printf("Already crawled: %s \n", userName)
 			}
 		case <-ctx.Done():
-			log.Println(ctx.Err())
+			crawler.log.Println(ctx.Err())
 		}
 	}
 }

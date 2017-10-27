@@ -26,6 +26,7 @@ type InstagramCrawler struct {
 	depth    int
 	curDepth int
 	dir      string
+	log      *log.Logger
 }
 
 func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
@@ -34,14 +35,14 @@ func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int
 	followerResp, err := crawler.service.UserFollowers(userID, maxID)
 	crawler.mutex.Unlock()
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 	if len(followerResp.Users) > 0 {
 		go func() {
 			for _, followers := range followerResp.Users {
 				if followers.Username != "" {
 					userChan <- followers.Username
-					log.Printf("Added %s to userChan \n", followers.Username)
+					crawler.log.Printf("Added %s to userChan \n", followers.Username)
 				}
 			}
 			// no need to crawl followers of followers yet
@@ -64,11 +65,11 @@ func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, use
 	resp, err := crawler.service.GetUserByUsername(userName)
 	crawler.mutex.Unlock()
 	if err != nil {
-		log.Printf("unable to get user info for %s \n", userName)
-		log.Fatalln(err)
+		crawler.log.Printf("unable to get user info for %s \n", userName)
+		crawler.log.Fatalln(err)
 	}
 	if resp.Status != "ok" {
-		log.Fatalln(resp.Status)
+		crawler.log.Fatalln(resp.Status)
 	}
 
 	go crawler.saveUserToFile(resp)
@@ -87,11 +88,11 @@ func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, use
 func (crawler *InstagramCrawler) saveUser(w io.Writer, resp response.GetUsernameResponse) {
 	data, err := json.Marshal(resp.User)
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 	_, err = w.Write(data)
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 }
 
@@ -100,7 +101,7 @@ func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 	userPath := path.Join(crawler.dir, instaUser.Username)
 	err := os.MkdirAll(userPath, 0700)
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 
 	fileName := fmt.Sprintf("%v-%s.json", time.Now().Unix(), instaUser.Username)
@@ -108,7 +109,7 @@ func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 
 	f, err := os.Create(filePath)
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 	crawler.saveUser(f, resp)
 }
@@ -116,12 +117,12 @@ func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 func (crawler *InstagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
 	resp, err := http.Get(r.User.HdProfilePicURLInfo.URL)
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		crawler.log.Fatalln(err)
 	}
 
 	p := path.Join(crawler.dir, r.User.Username)

@@ -2,11 +2,19 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
+	"io"
+
+	"encoding/json"
+	"path"
+
 	"github.com/ahmdrz/goinsta"
+	"github.com/ahmdrz/goinsta/response"
 	"golang.org/x/time/rate"
 )
 
@@ -16,6 +24,7 @@ type InstagramCrawler struct {
 	mutex    *sync.Mutex
 	depth    int
 	curDepth int
+	dir      string
 }
 
 func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
@@ -61,8 +70,7 @@ func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, use
 		log.Fatalln(resp.Status)
 	}
 
-	//@TODO add save to struct
-	go saveUserToFile(resp)
+	go crawler.saveUserToFile(resp)
 
 	crawler.mutex.Lock()
 	if crawler.curDepth <= crawler.depth {
@@ -72,4 +80,33 @@ func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, use
 	crawler.mutex.Unlock()
 
 	return
+}
+
+func (crawler *InstagramCrawler) saveUser(w io.Writer, resp response.GetUsernameResponse) {
+	data, err := json.Marshal(resp.User)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameResponse) {
+	instaUser := resp.User
+	userPath := path.Join(dir, instaUser.Username)
+	err := os.MkdirAll(userPath, 0700)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fileName := fmt.Sprintf("%v-%s.json", time.Now().Unix(), instaUser.Username)
+	filePath := path.Join(userPath, fileName)
+
+	f, err := os.Create(filePath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	crawler.saveUser(f, resp)
 }

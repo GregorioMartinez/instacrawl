@@ -2,23 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
 
-	"sync"
-
 	"github.com/ahmdrz/goinsta"
-	"github.com/ahmdrz/goinsta/response"
 )
 
 var dir string
@@ -43,7 +38,6 @@ func init() {
 
 func main() {
 
-	//@TODO Add depth flag
 	//@TODO Add limiter flags
 	users := flag.String("users", "", "Comma separated list of usernames to scrape")
 	configPath := flag.String("config", "", "Path of config file")
@@ -81,6 +75,7 @@ func main() {
 		service: instagram,
 		limiter: limiter,
 		mutex:   &sync.Mutex{},
+		dir:     dir,
 	}
 
 	if err := crawler.service.Login(); err != nil {
@@ -116,26 +111,5 @@ func main() {
 		case <-ctx.Done():
 			log.Println(ctx.Err())
 		}
-	}
-}
-
-func saveUserToFile(resp response.GetUsernameResponse) {
-	instaUser := resp.User
-	userPath := path.Join(dir, instaUser.Username)
-	err := os.MkdirAll(userPath, 0700)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	fileName := fmt.Sprintf("%v-%s.json", time.Now().Unix(), instaUser.Username)
-	filePath := path.Join(userPath, fileName)
-
-	data, err := json.Marshal(instaUser)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	err = ioutil.WriteFile(filePath, data, 0700)
-	if err != nil {
-		log.Fatalln(err)
 	}
 }

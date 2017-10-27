@@ -5,8 +5,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"os/user"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -16,33 +14,19 @@ import (
 	"github.com/ahmdrz/goinsta"
 )
 
-var dir string
-
-func init() {
-	u, err := user.Current()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	dir = path.Join(u.HomeDir, ".instacrawl")
-
-	_, err = os.Stat(dir)
-	if os.IsNotExist(err) {
-		log.Printf("Creating dir: %s \n", dir)
-		err = os.MkdirAll(dir, 0700)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-}
-
 func main() {
 
 	//@TODO Add limiter flags
 	users := flag.String("users", "", "Comma separated list of usernames to scrape")
 	configPath := flag.String("config", "", "Path of config file")
 	depth := flag.Int("depth", 0, "Max depth to crawl")
+	output := flag.String("output", "./", "path to store data")
 	flag.Parse()
+
+	err := createDir(*output)
+	if err != nil {
+		log.Fatalln("Error with output dir: %s", err.Error())
+	}
 
 	limit := rate.Every(time.Second * 2)
 	limiter := rate.NewLimiter(limit, 10)
@@ -75,7 +59,7 @@ func main() {
 		service: instagram,
 		limiter: limiter,
 		mutex:   &sync.Mutex{},
-		dir:     dir,
+		dir:     *output,
 	}
 
 	if err := crawler.service.Login(); err != nil {
@@ -112,4 +96,17 @@ func main() {
 			log.Println(ctx.Err())
 		}
 	}
+}
+
+func createDir(path string) error {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		log.Printf("Creating path: %s \n", path)
+		err = os.MkdirAll(path, 0700)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return err
 }

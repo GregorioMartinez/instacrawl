@@ -95,7 +95,7 @@ func (crawler *InstagramCrawler) saveUser(w io.Writer, resp response.GetUsername
 
 func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameResponse) {
 	instaUser := resp.User
-	userPath := path.Join(dir, instaUser.Username)
+	userPath := path.Join(crawler.dir, instaUser.Username)
 	err := os.MkdirAll(userPath, 0700)
 	if err != nil {
 		log.Fatalln(err)

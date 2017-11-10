@@ -24,8 +24,7 @@ func main() {
 	output := flag.String("output", "./", "path to store data")
 	flag.Parse()
 
-	err := createDir(*output)
-	if err != nil {
+	if err := createDir(*output); err != nil {
 		log.Fatalln("Error with output dir: %s", err.Error())
 	}
 
@@ -72,7 +71,6 @@ func main() {
 	if err := crawler.service.Login(); err != nil {
 		crawler.log.Fatalln("Unable to log in")
 	}
-	defer crawler.service.Logout()
 
 	if crawler.service.IsLoggedIn == false {
 		crawler.log.Fatalln("Not logged in")
@@ -82,7 +80,8 @@ func main() {
 
 	seen := make(map[string]bool)
 
-	for {
+	guard := false
+	for guard != true {
 		select {
 
 		case userName := <-userChan:
@@ -101,7 +100,12 @@ func main() {
 			}
 		case <-ctx.Done():
 			crawler.log.Println(ctx.Err())
+			guard = true
 		}
+	}
+
+	if err := crawler.service.Logout(); err != nil {
+		crawler.log.Println("unable to logout")
 	}
 }
 

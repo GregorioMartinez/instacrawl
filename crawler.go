@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,7 +20,7 @@ import (
 	"github.com/ahmdrz/goinsta/response"
 )
 
-type InstagramCrawler struct {
+type instagramCrawler struct {
 	service  *goinsta.Instagram
 	limiter  *rate.Limiter
 	mutex    *sync.Mutex
@@ -27,10 +28,13 @@ type InstagramCrawler struct {
 	curDepth int
 	dir      string
 	log      *log.Logger
+	db       *sql.DB
 }
 
-func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
-	crawler.limiter.Wait(context.Background())
+func (crawler *instagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
+	if err := crawler.limiter.Wait(context.Background()); err != nil {
+		crawler.log.Println("error waiting")
+	}
 	crawler.mutex.Lock()
 	followerResp, err := crawler.service.UserFollowers(userID, maxID)
 	crawler.mutex.Unlock()
@@ -57,10 +61,10 @@ func (crawler *InstagramCrawler) getFollowers(userChan chan<- string, userID int
 	}
 }
 
-func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, userChan chan<- string) {
+func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, userChan chan<- string) {
 	//@TODO fix ctx
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
-	defer cancel()
+	//ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
+	//defer cancel()
 	crawler.mutex.Lock()
 	resp, err := crawler.service.GetUserByUsername(userName)
 	crawler.mutex.Unlock()
@@ -85,7 +89,7 @@ func (crawler *InstagramCrawler) crawl(ctx context.Context, userName string, use
 	return
 }
 
-func (crawler *InstagramCrawler) saveUser(w io.Writer, resp response.GetUsernameResponse) {
+func (crawler *instagramCrawler) saveUser(w io.Writer, resp response.GetUsernameResponse) {
 	data, err := json.Marshal(resp.User)
 	if err != nil {
 		crawler.log.Fatalln(err)
@@ -96,7 +100,7 @@ func (crawler *InstagramCrawler) saveUser(w io.Writer, resp response.GetUsername
 	}
 }
 
-func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameResponse) {
+func (crawler *instagramCrawler) saveUserToFile(resp response.GetUsernameResponse) {
 	instaUser := resp.User
 	userPath := path.Join(crawler.dir, instaUser.Username)
 	err := os.MkdirAll(userPath, 0700)
@@ -114,17 +118,26 @@ func (crawler *InstagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 	crawler.saveUser(f, resp)
 }
 
-func (crawler *InstagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
+func (crawler *instagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
 	resp, err := http.Get(r.User.HdProfilePicURLInfo.URL)
 	if err != nil {
 		crawler.log.Fatalln(err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			crawler.log.Printf("error closing body responese: %s \n", err)
+		}
+	}()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		crawler.log.Fatalln(err)
 	}
 
 	p := path.Join(crawler.dir, r.User.Username)
-	ioutil.WriteFile(fmt.Sprintf("%s/%v-%s.jpg", p, time.Now().Unix(), r.User.Username), data, 0700)
+	name := fmt.Sprintf("%s/%v-%s.jpg", p, time.Now().Unix(), r.User.Username)
+	err = ioutil.WriteFile(name, data, 0700)
+	if err != nil {
+		crawler.log.Printf("unable to write %s to file %s", r.User.Username, name)
+	}
 }

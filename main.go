@@ -48,7 +48,7 @@ func main() {
 
 	instagram := goinsta.New(config.Username, config.Password)
 
-	crawler := InstagramCrawler{
+	crawler := instagramCrawler{
 		depth:   *depth,
 		service: instagram,
 		limiter: limiter,

@@ -7,29 +7,34 @@ import (
 	"os"
 )
 
-func getConfig(configPath string) (Config, error) {
-	var config Config
+func getConfig(configPath string) (config, error) {
+	var conf config
 
 	configFile, err := os.Open(configPath)
 	if err != nil {
-		return config, errors.New("unable to open config file")
+		return conf, errors.New("unable to open config file")
 	}
-	defer configFile.Close()
+
+	defer func() {
+		if err1 := configFile.Close(); err1 != nil {
+			err = err1
+		}
+	}()
 
 	data, err := ioutil.ReadAll(configFile)
 	if err != nil {
-		return config, errors.New("unable to read config file")
+		return conf, errors.New("unable to read config file")
 	}
 
-	err = json.Unmarshal(data, &config)
+	err = json.Unmarshal(data, &conf)
 	if err != nil {
-		return config, err
+		return conf, err
 	}
 
-	return config, nil
+	return conf, err
 }
 
-type Config struct {
+type config struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }

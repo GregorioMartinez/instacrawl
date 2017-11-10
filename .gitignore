@@ -3,3 +3,5 @@
 cle
 vendor/
 config.json
+
+*.db

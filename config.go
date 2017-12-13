@@ -27,14 +27,12 @@ func getConfig(configPath string) (config, error) {
 	}
 
 	err = json.Unmarshal(data, &conf)
-	if err != nil {
-		return conf, err
-	}
-
 	return conf, err
 }
 
 type config struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	NeoAuth   string `json:"neo_auth"`
+	MySQLAuth string `json:"mysql_auth"`
 }

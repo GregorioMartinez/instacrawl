@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/ahmdrz/goinsta"
 	"github.com/ahmdrz/goinsta/response"
+	"github.com/johnnadratowski/golang-neo4j-bolt-driver"
 )
 
 type instagramCrawler struct {
@@ -28,15 +28,20 @@ type instagramCrawler struct {
 	curDepth int
 	dir      string
 	log      *log.Logger
-	db       *sql.DB
+	neo      golangNeo4jBoltDriver.Conn
 }
 
-func (crawler *instagramCrawler) getFollowers(userChan chan<- string, userID int64, maxID string) {
+type instaUser struct {
+	parent response.GetUsernameResponse
+	child  *response.User
+}
+
+func (crawler *instagramCrawler) getFollowers(userChan chan<- string, dbChan chan *instaUser, resp response.GetUsernameResponse, maxID string) {
 	if err := crawler.limiter.Wait(context.Background()); err != nil {
 		crawler.log.Println("error waiting")
 	}
 	crawler.mutex.Lock()
-	followerResp, err := crawler.service.UserFollowers(userID, maxID)
+	followerResp, err := crawler.service.UserFollowers(resp.User.ID, maxID)
 	crawler.mutex.Unlock()
 	if err != nil {
 		crawler.log.Fatalln(err)
@@ -46,27 +51,32 @@ func (crawler *instagramCrawler) getFollowers(userChan chan<- string, userID int
 			for _, followers := range followerResp.Users {
 				if followers.Username != "" {
 					userChan <- followers.Username
-					crawler.log.Printf("Added %s to userChan \n", followers.Username)
+					dbChan <- &instaUser{
+						parent: resp,
+						child:  &followers,
+					}
 				}
 			}
-			// no need to crawl followers of followers yet
-			close(userChan)
 		}()
-	} else {
-		return
 	}
 
 	if followerResp.NextMaxID != "" {
-		crawler.getFollowers(userChan, userID, followerResp.NextMaxID)
+		if err := crawler.limiter.Wait(context.TODO()); err != nil {
+			crawler.getFollowers(userChan, dbChan, resp, followerResp.NextMaxID)
+		}
 	}
 }
 
-func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, userChan chan<- string) {
+func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, userChan chan<- string, dbChan chan *instaUser) {
 	//@TODO fix ctx
 	//ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
 	//defer cancel()
 	crawler.mutex.Lock()
 	resp, err := crawler.service.GetUserByUsername(userName)
+	dbChan <- &instaUser{
+		child:  nil,
+		parent: resp,
+	}
 	crawler.mutex.Unlock()
 	if err != nil {
 		crawler.log.Printf("unable to get user info for %s \n", userName)
@@ -75,14 +85,12 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 	if resp.Status != "ok" {
 		crawler.log.Fatalln(resp.Status)
 	}
-
-	go crawler.saveUserToFile(resp)
-	go crawler.saveUserPhoto(resp)
-
 	crawler.mutex.Lock()
 	if crawler.curDepth <= crawler.depth {
-		go crawler.getFollowers(userChan, resp.User.ID, "")
-		crawler.curDepth++
+		if err := crawler.limiter.Wait(ctx); err != nil {
+			go crawler.getFollowers(userChan, dbChan, resp, "")
+			crawler.curDepth++
+		}
 	}
 	crawler.mutex.Unlock()
 

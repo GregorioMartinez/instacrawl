@@ -80,6 +80,11 @@ func (db *dataStore) shouldCrawl(userName string) bool {
 	return false
 }
 
+func (db *dataStore) Close() {
+	db.neo.Close()
+	db.sql.Close()
+}
+
 func (db *dataStore) saveUserSQL(r response.GetUsernameResponse) error {
 	stmt, err := db.sql.Prepare(`
 		REPLACE INTO user (

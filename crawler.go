@@ -36,6 +36,30 @@ type instaUser struct {
 	child  *response.User
 }
 
+func newCrawler(config config, limit time.Duration, depth int, output string) *instagramCrawler {
+
+	limiter := rate.NewLimiter(rate.Every(time.Second*limit), 10)
+
+	if err := createDir(output); err != nil {
+		log.Fatalln("Error with output dir: %s", err.Error())
+	}
+
+	logFile, err := os.Create(fmt.Sprintf("%s/instacrawl.log", output))
+	if err != nil {
+		log.Fatal("unable to create log file", err)
+	}
+	logger := log.New(logFile, "", log.Ldate|log.Ltime|log.Llongfile)
+
+	return &instagramCrawler{
+		depth:   depth,
+		service: goinsta.New(config.Username, config.Password),
+		limiter: limiter,
+		mutex:   &sync.Mutex{},
+		dir:     output,
+		log:     logger,
+	}
+}
+
 func (crawler *instagramCrawler) getFollowers(userChan chan<- string, dbChan chan *instaUser, resp response.GetUsernameResponse, maxID string) {
 	if err := crawler.limiter.Wait(context.Background()); err != nil {
 		crawler.log.Println("error waiting")
@@ -71,6 +95,9 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 	//@TODO fix ctx
 	//ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
 	//defer cancel()
+	if err := crawler.limiter.Wait(context.TODO()); err != nil {
+		crawler.log.Fatalln(err)
+	}
 	crawler.mutex.Lock()
 	resp, err := crawler.service.GetUserByUsername(userName)
 	dbChan <- &instaUser{

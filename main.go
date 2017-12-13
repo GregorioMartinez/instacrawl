@@ -10,8 +10,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-//@TODO fix logic for adding to dbChan and rate limiting for instagram
-
 func main() {
 
 	users := flag.String("users", "", "Comma separated list of usernames to scrape")
@@ -36,7 +34,6 @@ func main() {
 		crawler.log.Fatalln("No usernames provided to scrape.")
 	}
 
-	// User names to crawl
 	userChan := make(chan string)
 	dbChan := make(chan *instaUser)
 
@@ -49,7 +46,6 @@ func main() {
 
 	for {
 		select {
-
 		case userName := <-userChan:
 			if data.shouldCrawl(userName) {
 				go crawler.crawl(context.Background(), userName, userChan, dbChan)
@@ -60,7 +56,6 @@ func main() {
 			}
 		}
 	}
-
 }
 
 func createDir(path string) error {

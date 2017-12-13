@@ -4,4 +4,6 @@ cle
 vendor/
 config.json
 
+notes.txt
+*.sql
 *.db

@@ -115,9 +115,10 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 	crawler.mutex.Lock()
 	if crawler.curDepth <= crawler.depth {
 		if err := crawler.limiter.Wait(ctx); err != nil {
-			go crawler.getFollowers(userChan, dbChan, resp, "")
-			crawler.curDepth++
+			crawler.log.Fatalln(err)
 		}
+		go crawler.getFollowers(userChan, dbChan, resp, "")
+		crawler.curDepth++
 	}
 	crawler.mutex.Unlock()
 

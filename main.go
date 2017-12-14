@@ -40,9 +40,11 @@ func main() {
 	data := newDataStore(config.NeoAuth, config.MySQLAuth)
 	defer data.Close()
 
-	for _, userName := range userNames {
-		userChan <- userName
-	}
+	go func() {
+		for _, userName := range userNames {
+			userChan <- userName
+		}
+	}()
 
 	for {
 		select {

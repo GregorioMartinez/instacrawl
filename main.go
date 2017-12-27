@@ -16,6 +16,7 @@ func main() {
 	configPath := flag.String("config", "", "Path of config file")
 	depth := flag.Int("depth", 2, "Max depth to crawl")
 	output := flag.String("output", "./", "Path to store data")
+	verbose := flag.Bool("verbose", false, "Verbose output")
 	flag.Parse()
 
 	config, err := getConfig(*configPath)
@@ -42,6 +43,9 @@ func main() {
 
 	go func() {
 		for _, userName := range userNames {
+			if *verbose {
+				log.Printf("Added %s to userChan", userName)
+			}
 			userChan <- userName
 		}
 	}()
@@ -50,9 +54,19 @@ func main() {
 		select {
 		case userName := <-userChan:
 			if data.shouldCrawl(userName) {
+				if *verbose {
+					log.Printf("Crawling %s", userName)
+				}
 				go crawler.crawl(context.Background(), userName, userChan, dbChan)
 			}
 		case r := <-dbChan:
+			if *verbose {
+				if r.child != nil {
+					log.Printf("Saving %s : %s to database", r.parent.User.Username, r.child.Username)
+				} else {
+					log.Printf("Saving %s to database", r.parent.User.Username)
+				}
+			}
 			if err := data.save(r); err != nil {
 				crawler.log.Println(err)
 			}

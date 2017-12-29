@@ -68,7 +68,8 @@ func (crawler *instagramCrawler) getFollowers(userChan chan<- string, dbChan cha
 	followerResp, err := crawler.service.UserFollowers(resp.User.ID, maxID)
 	crawler.mutex.Unlock()
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Println(err)
+		return
 	}
 	if len(followerResp.Users) > 0 {
 		go func() {
@@ -86,8 +87,12 @@ func (crawler *instagramCrawler) getFollowers(userChan chan<- string, dbChan cha
 
 	if followerResp.NextMaxID != "" {
 		if err := crawler.limiter.Wait(context.TODO()); err != nil {
+			log.Println("Getting next page of followers")
 			crawler.getFollowers(userChan, dbChan, resp, followerResp.NextMaxID)
 		}
+	} else {
+		log.Println("No more pages of followers")
+
 	}
 }
 
@@ -96,7 +101,8 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 	//ctx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
 	//defer cancel()
 	if err := crawler.limiter.Wait(context.TODO()); err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Println(err)
+		return
 	}
 	crawler.mutex.Lock()
 	resp, err := crawler.service.GetUserByUsername(userName)
@@ -107,15 +113,18 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 	crawler.mutex.Unlock()
 	if err != nil {
 		crawler.log.Printf("unable to get user info for %s \n", userName)
-		crawler.log.Fatalln(err)
+		crawler.log.Println(err)
+		return
 	}
 	if resp.Status != "ok" {
-		crawler.log.Fatalln(resp.Status)
+		crawler.log.Printf("Status not ok: %s \n", resp.Status)
+		return
 	}
 	crawler.mutex.Lock()
 	if crawler.curDepth <= crawler.depth {
 		if err := crawler.limiter.Wait(ctx); err != nil {
-			crawler.log.Fatalln(err)
+			crawler.log.Println(err)
+			return
 		}
 		go crawler.getFollowers(userChan, dbChan, resp, "")
 		crawler.curDepth++
@@ -128,11 +137,11 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 func (crawler *instagramCrawler) saveUser(w io.Writer, resp response.GetUsernameResponse) {
 	data, err := json.Marshal(resp.User)
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Printf("unable to marshal data for user: %s \n", err)
 	}
 	_, err = w.Write(data)
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Printf("unable to write data to file: %s \n", err)
 	}
 }
 
@@ -141,7 +150,7 @@ func (crawler *instagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 	userPath := path.Join(crawler.dir, instaUser.Username)
 	err := os.MkdirAll(userPath, 0700)
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Printf("unable to save user to file: %s \n", err)
 	}
 
 	fileName := fmt.Sprintf("%v-%s.json", time.Now().Unix(), instaUser.Username)
@@ -149,7 +158,7 @@ func (crawler *instagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 
 	f, err := os.Create(filePath)
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Printf("unable to create file: %s", err)
 	}
 	crawler.saveUser(f, resp)
 }
@@ -157,7 +166,7 @@ func (crawler *instagramCrawler) saveUserToFile(resp response.GetUsernameRespons
 func (crawler *instagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
 	resp, err := http.Get(r.User.HdProfilePicURLInfo.URL)
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Printf("unable to get user photo: %s", err)
 	}
 
 	defer func() {
@@ -167,7 +176,7 @@ func (crawler *instagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
 	}()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		crawler.log.Fatalln(err)
+		crawler.log.Fatalln("unable to read response for user photo: %s \n", err)
 	}
 
 	p := path.Join(crawler.dir, r.User.Username)

@@ -87,12 +87,12 @@ func (crawler *instagramCrawler) getFollowers(userChan chan<- string, dbChan cha
 
 	if followerResp.NextMaxID != "" {
 		if err := crawler.limiter.Wait(context.TODO()); err != nil {
-			log.Println("Getting next page of followers")
-			crawler.getFollowers(userChan, dbChan, resp, followerResp.NextMaxID)
+			crawler.log.Printf("error waiting: %s", err)
 		}
+		crawler.log.Println("Getting next page of followers")
+		crawler.getFollowers(userChan, dbChan, resp, followerResp.NextMaxID)
 	} else {
-		log.Println("No more pages of followers")
-
+		crawler.log.Println("No more pages of followers")
 	}
 }
 

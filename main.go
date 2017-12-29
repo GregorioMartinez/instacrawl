@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -50,7 +51,8 @@ func main() {
 		}
 	}()
 
-	for {
+	guard := false
+	for !guard {
 		select {
 		case userName := <-userChan:
 			if data.shouldCrawl(userName) {
@@ -70,6 +72,9 @@ func main() {
 			if err := data.save(r); err != nil {
 				crawler.log.Println(err)
 			}
+		case <-time.Tick(5 * time.Minute):
+			log.Println("5 minutes with no activity. Shutting down")
+			guard = true
 		}
 	}
 }

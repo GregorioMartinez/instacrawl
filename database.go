@@ -49,7 +49,7 @@ func (db *dataStore) save(r *instaUser) error {
 func (db *dataStore) shouldCrawl(userName string) bool {
 	rows, err := db.sql.Query("SELECT COUNT(id), last_crawl FROM user WHERE username=? GROUP BY id", userName)
 	if err != nil {
-		log.Fatal("Error determining if should crawl", err)
+		log.Printf("Error determining if should crawl: %s \n", err)
 		return false
 	}
 
@@ -68,7 +68,7 @@ func (db *dataStore) shouldCrawl(userName string) bool {
 
 		s, err := time.Parse("2006-01-02", crawlDate)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("unable to parse time: %s \n", err)
 			return false
 		}
 
@@ -120,7 +120,8 @@ func (db *dataStore) saveUserSQL(r response.GetUsernameResponse) error {
 		u.Biography, u.HasChaining, t)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("unable to save user data to mysql: %s \n", err)
+		return err
 	}
 
 	return nil

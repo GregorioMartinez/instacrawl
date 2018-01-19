@@ -94,14 +94,14 @@ func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string, s
 						following_count, external_url,
 						follower_count, has_anonymous_profile_picture, usertags_count,
 						username, geo_media_count, is_business,
-						biography, has_chaining, last_crawl, label, source)
+						biography, has_chaining, last_crawl, label, source, is_private)
 		VALUES (
 			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?,
-			?, ?, ?, ?, ?)
+			?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string, s
 		u.FollowingCount, u.ExternalURL,
 		u.FollowerCount, u.HasAnonymousProfilePicture, u.UserTagsCount,
 		u.Username, u.GeoMediaCount, u.IsBusiness,
-		u.Biography, u.HasChaining, t, label, source)
+		u.Biography, u.HasChaining, t, label, source, u.IsPrivate)
 
 	if err != nil {
 		log.Printf("unable to save user data to mysql: %s \n", err)
@@ -134,8 +134,8 @@ func (db *dataStore) saveFollowerSQL(r *response.User, label string, source stri
 		REPLACE INTO insta.user (
 							id,
 							is_verified, is_favorite, full_name,
-							has_anonymous_profile_picture, username, last_crawl, label, source)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+							has_anonymous_profile_picture, username, last_crawl, label, source, is_private)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -143,12 +143,13 @@ func (db *dataStore) saveFollowerSQL(r *response.User, label string, source stri
 	defer stmt.Close()
 
 	t := time.Now().Format("2006-01-02")
-	stmt.Exec(
+	_, err = stmt.Exec(
 		r.ID,
 		r.IsVerified, r.IsFavorite, r.FullName,
-		r.HasAnonymousProfilePicture, r.Username, t,
-		t, label, source)
-	return nil
+		r.HasAnonymousProfilePicture, r.Username,
+		t, label, source, r.IsPrivate)
+
+	return err
 }
 
 func (db *dataStore) saveGraph(r *instaUser) error {

@@ -171,7 +171,7 @@ func (crawler *instagramCrawler) saveUserPhoto(r response.GetUsernameResponse) {
 
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
-			crawler.log.Printf("error closing body responese: %s \n", err)
+			crawler.log.Printf("error closing body response: %s \n", err)
 		}
 	}()
 	data, err := ioutil.ReadAll(resp.Body)

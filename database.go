@@ -30,17 +30,17 @@ func newDataStore(neoAuth string, mysqlAuth string) *dataStore {
 	return &dataStore{sql: db, neo: neo}
 }
 
-func (db *dataStore) save(r *instaUser, label string) error {
+func (db *dataStore) save(r *instaUser, label string, source string) error {
 	if r.child != nil {
 		if err := db.saveGraph(r); err != nil && r.child != nil {
 			return err
 		}
-		if err := db.saveFollowerSQL(r.child, label); err != nil {
+		if err := db.saveFollowerSQL(r.child, label, source); err != nil {
 			return err
 		}
 	}
 
-	if err := db.saveUserSQL(r.parent, label); err != nil {
+	if err := db.saveUserSQL(r.parent, label, source); err != nil {
 		return err
 	}
 	return nil
@@ -85,7 +85,7 @@ func (db *dataStore) Close() {
 	db.sql.Close()
 }
 
-func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string) error {
+func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string, source string) error {
 	stmt, err := db.sql.Prepare(`
 		REPLACE INTO user (
 						id,
@@ -94,14 +94,14 @@ func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string) e
 						following_count, external_url,
 						follower_count, has_anonymous_profile_picture, usertags_count,
 						username, geo_media_count, is_business,
-						biography, has_chaining, last_crawl, label)
+						biography, has_chaining, last_crawl, label, source)
 		VALUES (
 			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?,
-			?, ?, ?, ?)
+			?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string) e
 		u.FollowingCount, u.ExternalURL,
 		u.FollowerCount, u.HasAnonymousProfilePicture, u.UserTagsCount,
 		u.Username, u.GeoMediaCount, u.IsBusiness,
-		u.Biography, u.HasChaining, t, label)
+		u.Biography, u.HasChaining, t, label, source)
 
 	if err != nil {
 		log.Printf("unable to save user data to mysql: %s \n", err)
@@ -127,15 +127,15 @@ func (db *dataStore) saveUserSQL(r response.GetUsernameResponse, label string) e
 	return nil
 }
 
-func (db *dataStore) saveFollowerSQL(r *response.User, label string) error {
+func (db *dataStore) saveFollowerSQL(r *response.User, label string, source string) error {
 
 	// ignore errors that would occur on dupes
 	stmt, err := db.sql.Prepare(`
 		REPLACE INTO insta.user (
 							id,
 							is_verified, is_favorite, full_name,
-							has_anonymous_profile_picture, username, last_crawl, label)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+							has_anonymous_profile_picture, username, last_crawl, label, source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (db *dataStore) saveFollowerSQL(r *response.User, label string) error {
 		r.ID,
 		r.IsVerified, r.IsFavorite, r.FullName,
 		r.HasAnonymousProfilePicture, r.Username, t,
-		t, label)
+		t, label, source)
 	return nil
 }
 

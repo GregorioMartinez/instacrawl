@@ -18,7 +18,8 @@ func main() {
 	depth := flag.Int("depth", 2, "Max depth to crawl")
 	output := flag.String("output", "./", "Path to store data")
 	verbose := flag.Bool("verbose", false, "Verbose output")
-	label := flag.String("label", "", "Source of initial username")
+	label := flag.String("label", "", "Manually set users as real or fake")
+	source := flag.String("source", "", "Source of initial seed")
 	flag.Parse()
 
 	config, err := getConfig(*configPath)
@@ -70,7 +71,7 @@ func main() {
 					log.Printf("Saving %s to database", r.parent.User.Username)
 				}
 			}
-			if err := data.save(r, *label); err != nil {
+			if err := data.save(r, *label, *source); err != nil {
 				crawler.log.Println(err)
 			}
 		case <-time.Tick(5 * time.Minute):

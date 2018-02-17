@@ -20,7 +20,14 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Verbose output")
 	label := flag.String("label", "", "Manually set users as real or fake")
 	source := flag.String("source", "", "Source of initial seed")
+	duration := flag.String("timeout", "300s", "Timeout in seconds before terminating")
+
 	flag.Parse()
+
+	timeout, err := time.ParseDuration(*duration)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	config, err := getConfig(*configPath)
 	if err != nil {
@@ -74,8 +81,8 @@ func main() {
 			if err := data.save(r, *label, *source); err != nil {
 				crawler.log.Println(err)
 			}
-		case <-time.Tick(5 * time.Minute):
-			log.Println("5 minutes with no activity. Shutting down")
+		case <-time.Tick(timeout):
+			log.Printf("%v with no activity. Shutting down \n", *duration)
 			guard = true
 		}
 	}

@@ -48,11 +48,11 @@ func main() {
 		crawler.log.Fatalln("No usernames provided to scrape.")
 	}
 
-	var forceList = make(map[string]bool)
+	var ogUsers = make(map[string]bool)
 
 	if *force {
 		for _, user := range userNames {
-			forceList[user] = true
+			ogUsers[user] = true
 		}
 	}
 
@@ -75,7 +75,7 @@ func main() {
 	for !guard {
 		select {
 		case userName := <-userChan:
-			if *force && forceList[userName] {
+			if *force && ogUsers[userName] {
 				if *verbose {
 					log.Printf("(Forced) Crawling %s", userName)
 				}
@@ -94,8 +94,23 @@ func main() {
 					log.Printf("Saving %s to database", r.parent.User.Username)
 				}
 			}
-			if err := data.save(r, *label, *source); err != nil {
+			if err := data.save(r); err != nil {
 				crawler.log.Println(err)
+			}
+
+			if ogUsers[r.parent.User.Username] && r.child == nil {
+				if *label != "" {
+					log.Printf("Updating label for %s to: %s \n", r.parent.User.Username, *label)
+					if err := data.updateField(r.parent.User.ID, "label", *label); err != nil {
+						crawler.log.Println(err)
+					}
+				}
+				if *source != "" {
+					log.Printf("Updating source for %s to: %s \n", r.parent.User.Username, *source)
+					if err := data.updateField(r.parent.User.ID, "source", *source); err != nil {
+						crawler.log.Println(err)
+					}
+				}
 			}
 		case <-time.Tick(timeout):
 			log.Printf("%v with no activity. Shutting down \n", *duration)

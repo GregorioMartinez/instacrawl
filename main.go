@@ -23,6 +23,7 @@ func main() {
 	duration := flag.String("timeout", "300s", "Timeout in seconds before terminating")
 	burst := flag.Int("rate", 10, "Max number of calls to make in burst to Instagram")
 	limit := flag.Duration("limit", 2, "Minimum time between, in seconds, at which calls can be made")
+	force := flag.Bool("force", false, "Force recrawl regardless of last crawl date")
 
 	flag.Parse()
 
@@ -47,6 +48,14 @@ func main() {
 		crawler.log.Fatalln("No usernames provided to scrape.")
 	}
 
+	var forceList = make(map[string]bool)
+
+	if *force {
+		for _, user := range userNames {
+			forceList[user] = true
+		}
+	}
+
 	userChan := make(chan string)
 	dbChan := make(chan *instaUser)
 
@@ -66,7 +75,12 @@ func main() {
 	for !guard {
 		select {
 		case userName := <-userChan:
-			if data.shouldCrawl(userName) {
+			if *force && forceList[userName] {
+				if *verbose {
+					log.Printf("(Forced) Crawling %s", userName)
+				}
+				go crawler.crawl(context.Background(), userName, userChan, dbChan)
+			} else if data.shouldCrawl(userName) {
 				if *verbose {
 					log.Printf("Crawling %s", userName)
 				}

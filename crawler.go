@@ -36,9 +36,9 @@ type instaUser struct {
 	child  *response.User
 }
 
-func newCrawler(config config, limit time.Duration, depth int, output string) *instagramCrawler {
+func newCrawler(config config, limit time.Duration, depth int, output string, burst int) *instagramCrawler {
 
-	limiter := rate.NewLimiter(rate.Every(time.Second*limit), 10)
+	limiter := rate.NewLimiter(rate.Every(time.Second*limit), burst)
 
 	if err := createDir(output); err != nil {
 		log.Fatalln("Error with output dir: %s", err.Error())

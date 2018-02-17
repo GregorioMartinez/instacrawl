@@ -21,6 +21,8 @@ func main() {
 	label := flag.String("label", "", "Manually set users as real or fake")
 	source := flag.String("source", "", "Source of initial seed")
 	duration := flag.String("timeout", "300s", "Timeout in seconds before terminating")
+	burst := flag.Int("rate", 10, "Max number of calls to make in burst to Instagram")
+	limit := flag.Duration("limit", 2, "Minimum time between, in seconds, at which calls can be made")
 
 	flag.Parse()
 
@@ -34,7 +36,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	crawler := newCrawler(config, 2, *depth, *output)
+	crawler := newCrawler(config, *limit, *depth, *output, *burst)
 
 	if err := crawler.service.Login(); err != nil {
 		crawler.log.Fatalln("Unable to log in")

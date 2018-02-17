@@ -121,7 +121,7 @@ func (crawler *instagramCrawler) crawl(ctx context.Context, userName string, use
 		return
 	}
 	crawler.mutex.Lock()
-	if crawler.curDepth <= crawler.depth {
+	if crawler.curDepth < crawler.depth {
 		if err := crawler.limiter.Wait(ctx); err != nil {
 			crawler.log.Println(err)
 			return
